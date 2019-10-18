@@ -121,11 +121,16 @@ func calStock(c echo.Context) (err error) {
 			for i := 4; i < 601; i++ {
 				_name := fmt.Sprintf("A%v", i)
 
-				name := f.GetCellValue("Sheet1", _name)
+				name, err := f.GetCellValue("Sheet1", _name)
+				if err != nil {
+					fmt.Println(err)
+				}
 
 				_lastest := fmt.Sprintf("E%v", i)
-				lastest := f.GetCellValue("Sheet1", _lastest)
-
+				lastest, err := f.GetCellValue("Sheet1", _lastest)
+				if err != nil {
+					fmt.Println(err)
+				}
 				// fmt.Println(name)
 				// fmt.Println(lastest)
 				if strings.TrimSpace(name) == "SPA" {
@@ -152,13 +157,16 @@ func calStock(c echo.Context) (err error) {
 			}
 
 			// เอา วันที่จากใน Excel มาแปลงเวลาเพื่อเตรียมบรรจุลง DB
-			date := f.GetCellValue("Sheet1", "D1")
+			date, err := f.GetCellValue("Sheet1", "D1")
+			if err != nil {
+				fmt.Println(err)
+			}
 			layout := "01-02-06"
 			t, _ := time.Parse(layout, date)
+			// อย่าทำแบบนี้เพราะแบบนี้ SQL INJECTION ได้
 
 			jsonbMaiStocks, _ := json.Marshal(maiStocks)
 			jsonbSetStocks, _ := json.Marshal(setStocks)
-			// อย่าทำแบบนี้เพราะแบบนี้ SQL INJECTION ได้ไว้ก่อนเดี๋ยวมาแก้
 			params := make(map[interface{}]interface{})
 			params["sql"] = fmt.Sprintf("INSERT INTO stock_price (date,set,mai) VALUES ('%v','%s','%s')", t.Format(time.RFC3339), jsonbSetStocks, jsonbMaiStocks)
 			Execute(params)
