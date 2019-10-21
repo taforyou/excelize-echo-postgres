@@ -41,6 +41,14 @@ func Execute(params map[interface{}]interface{}) {
 	//defer sqlPostgresHandler.Conn.Close()
 }
 
+func Execute2(txn BonanzaTransaction) error {
+	_, err := sqlPostgresHandler.Conn.Exec(`INSERT INTO portfolio_transactions (invest_tx_id,portfolio_id,portfolio_code,security_id,security_code,ref_security_id,ref_security_code,invest_tx_type_id,invest_tx_type_code,cash_type_id,cash_type_code,trade_date,settled_date,tradable_date,units,unit_cost,yield,cost_amount,accrued_int,commission_rate,commision_amount,wh_tax_rate,wh_tax_amount,vat_rate,vat_amount,settle_amount,net_amount,principal_amount,is_effect_cash,currency_id,currency_code,broker_id,broker_code,counter_party_id,counter_party_code,tax_payer_id,tax_payer_code) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37)`, txn.INVESTTXID, txn.PORTFOLIOID, txn.PORTFOLIOCODE, txn.SECURITYID, txn.SECURITYCODE, NewNullString(txn.REFSECURITYID), NewNullString(txn.REFSECURITYCODE), txn.INVESTTXTYPEID, txn.INVESTTXTYPECODE, NewNullString(txn.CASHTXTYPEID), NewNullString(txn.CASHTXTYPECODE), txn.TRADEDATE, txn.SETTLEDATE, NewNullString(txn.TRADABLEDATE), txn.UNIT, txn.UNITCOST, txn.YIELD, txn.COSTAMOUNT, txn.ACCRUEDINT, txn.COMMISSIONRATE, txn.COMMISSIONAMOUNT, txn.WHTAXRATE, txn.WHTAXAMT, NewNullString(txn.VATRATE), txn.VATAMOUNT, txn.SETTLEAMOUNT, txn.NETAMOUNT, txn.PRINCIPALAMOUNT, txn.ISEFFECTCASH, txn.CURRENCYID, txn.CURRENCYCODE, NewNullString(txn.BROKERID), NewNullString(txn.BROKERCODE), NewNullString(txn.COUNTERPARTYID), NewNullString(txn.COUNTERPARTYCODE), NewNullString(txn.TAXPAYERID), NewNullString(txn.TAXPAYERCODE))
+	if err != nil {
+		panic(err)
+	}
+	return err
+}
+
 type BonanzaTransaction struct {
 	INVESTTXID       string
 	PORTFOLIOID      string
@@ -132,15 +140,18 @@ func calStock(c echo.Context) (err error) {
 		for i, row := range rows {
 
 			transaction := BonanzaTransaction{}
-			for j, colCell := range row {
-				// rows ที่ i == 0 เป็น Header
-				if i == 0 {
-					headerIndex = append(headerIndex, colCell)
-				} else {
-					//fmt.Println("cell name : ", headerIndex[j], " => ", colCell)
 
+			for j, colCell := range row {
+				// fmt.Println(i, j, colCell)
+				// rows ที่ i == 0 เป็น Header
+				headerIndex = append(headerIndex, colCell)
+
+				if i != 0 {
 					switch header := headerIndex[j]; header {
+
 					case "INVESTTXID":
+						// post_transaction_no
+						//iColCell, _ := strconv.Atoi(colCell)
 						transaction.INVESTTXID = colCell
 					case "PORTFOLIOID":
 						transaction.PORTFOLIOID = colCell
@@ -149,26 +160,49 @@ func calStock(c echo.Context) (err error) {
 					case "SECURITYID":
 						transaction.SECURITYID = colCell
 					case "SECURITYCODE":
+						// security_code
 						transaction.SECURITYCODE = colCell
 					case "REFSECURITYID":
+						if colCell == "NULL" || colCell == "" {
+							colCell = ""
+						}
 						transaction.REFSECURITYID = colCell
 					case "REFSECURITYCODE":
+						if colCell == "NULL" || colCell == "" {
+							colCell = ""
+						}
 						transaction.REFSECURITYCODE = colCell
 					case "INVESTTXTYPEID":
 						transaction.INVESTTXTYPEID = colCell
 					case "INVESTTXTYPECODE":
 						transaction.INVESTTXTYPECODE = colCell
 					case "CASHTXTYPEID":
+						if colCell == "NULL" || colCell == "" {
+							colCell = ""
+						}
 						transaction.CASHTXTYPEID = colCell
 					case "CASHTXTYPECODE":
+						// ตรงนี้อยากแยก Managment fee กับ custodian fee ให้ได้
+						if colCell == "NULL" || colCell == "" {
+							colCell = ""
+						}
 						transaction.CASHTXTYPECODE = colCell
 					case "TRADEDATE":
+						// trade_date
 						transaction.TRADEDATE = colCell
 					case "SETTLEDATE":
+						// settled_date
 						transaction.SETTLEDATE = colCell
 					case "TRADABLEDATE":
+						if colCell == "NULL" || colCell == "" {
+							colCell = ""
+						}
 						transaction.TRADABLEDATE = colCell
 					case "UNIT":
+						// ไม่อยากให้มี unit เป็น 0 เลย
+						if colCell == "0" || colCell == "" {
+							colCell = "1"
+						}
 						transaction.UNIT = colCell
 					case "UNITCOST":
 						transaction.UNITCOST = colCell
@@ -187,6 +221,9 @@ func calStock(c echo.Context) (err error) {
 					case "WHTAXAMT":
 						transaction.WHTAXAMT = colCell
 					case "VATRATE":
+						if colCell == "NULL" || colCell == "" {
+							colCell = ""
+						}
 						transaction.VATRATE = colCell
 					case "VATAMOUNT":
 						transaction.VATAMOUNT = colCell
@@ -197,22 +234,45 @@ func calStock(c echo.Context) (err error) {
 					case "PRINCIPALAMOUNT":
 						transaction.PRINCIPALAMOUNT = colCell
 					case "ISEFFECTCASH":
+						if colCell == "Y" || colCell == "y" {
+							colCell = "true"
+						} else if colCell == "N" || colCell == "n" {
+							colCell = "false"
+						}
 						transaction.ISEFFECTCASH = colCell
 					case "CURRENCYID":
 						transaction.CURRENCYID = colCell
 					case "CURRENCYCODE":
 						transaction.CURRENCYCODE = colCell
 					case "BROKERID":
+						if colCell == "NULL" || colCell == "" {
+							colCell = ""
+						}
 						transaction.BROKERID = colCell
 					case "BROKERCODE":
+						if colCell == "NULL" || colCell == "" {
+							colCell = ""
+						}
 						transaction.BROKERCODE = colCell
 					case "COUNTERPARTYID":
+						if colCell == "NULL" || colCell == "" {
+							colCell = ""
+						}
 						transaction.COUNTERPARTYID = colCell
 					case "COUNTERPARTYCODE":
+						if colCell == "NULL" || colCell == "" {
+							colCell = ""
+						}
 						transaction.COUNTERPARTYCODE = colCell
 					case "TAXPAYERID":
+						if colCell == "NULL" || colCell == "" {
+							colCell = ""
+						}
 						transaction.TAXPAYERID = colCell
 					case "TAXPAYERCODE":
+						if colCell == "NULL" || colCell == "" {
+							colCell = ""
+						}
 						transaction.TAXPAYERCODE = colCell
 					case "ISCONFIRMED":
 						transaction.ISCONFIRMED = colCell
@@ -233,45 +293,22 @@ func calStock(c echo.Context) (err error) {
 					default:
 						fmt.Println("!!! OUT OF HEADER !!! ==> ", header)
 					}
-
-					transactions = append(transactions, transaction)
-					// switch {
-					// case t.Hour() < 12:
-					// 	fmt.Println("It's before noon")
-					// default:
-					// 	fmt.Println("It's after noon")
-					// }
-
-					// switch os := runtime.GOOS; os {
-					// case "darwin":
-					// 	fmt.Println("OS X.")
-					// case "linux":
-					// 	fmt.Println("Linux.")
-					// default:
-					// 	// freebsd, openbsd,
-					// 	// plan9, windows...
-					// 	fmt.Printf("%s.\n", os)
-					// }
-
-					//fmt.Println("headerIndex[j] ", headerIndex[j])
-					// test := fmt.Sprintf("transaction.%v", headerIndex[j])
-					// test = 11
-					//transaction.headerIndex[j] = colCell
 				}
-
 			}
-
+			if i != 0 {
+				transactions = append(transactions, transaction)
+			}
 		}
 
-		// แปลง transactions เพื่อ Inset เข้า DB
-		//params["sql"] = fmt.Sprintf("INSERT INTO portfolio_transactions (user_id,set,trade_date,settled_date,security_code,class,security_type,investment,order_no,pre_transaction_no,post_transaction_no,linked_transaction_no,transaction_type,issuer,counter_party_broker,cash_type,yield,units,transaction_currency,cost_per_unit_exclude_commission,commission_percentage,commission_amount,vat,vat_amount,commission_and_vat,settlement_amount,net_amount,cash_security_code,status,posttime,remark,is_import_order,portfolio_name,institute,action,maturity_date,cost_amount,portfolio_currency,security_id,security_code_ref,portfolio_id) VALUES ('%v','%s','%s')", jsonbSetStocks, jsonbMaiStocks)
-		// params := make(map[interface{}]interface{})
-		// Execute(params)
-
+		for _, txn := range transactions {
+			fmt.Println(txn)
+			Execute2(txn)
+		}
 	}
 
-	defer db.Close()
+	// userId := 4 // mock ไปก่อน
 
+	defer db.Close()
 	return c.JSON(http.StatusOK, "OK")
 
 }
@@ -297,4 +334,14 @@ func ConnDB() *sql.DB {
 
 	return db
 
+}
+
+func NewNullString(s string) sql.NullString {
+	if len(s) == 0 {
+		return sql.NullString{}
+	}
+	return sql.NullString{
+		String: s,
+		Valid:  true,
+	}
 }
