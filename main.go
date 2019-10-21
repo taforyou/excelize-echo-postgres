@@ -2,13 +2,9 @@ package main
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
-	"strings"
-	"time"
 
 	_ "github.com/lib/pq"
 
@@ -45,19 +41,52 @@ func Execute(params map[interface{}]interface{}) {
 	//defer sqlPostgresHandler.Conn.Close()
 }
 
-type StockPrice struct {
-	Bid     string   `json:"bid"`
-	Name    string   `json:"name"`
-	Open    string   `json:"open"`
-	Marks   []string `json:"marks"`
-	Offer   string   `json:"offer"`
-	Value   string   `json:"value"`
-	Change  string   `json:"change"`
-	Lowest  string   `json:"lowest"`
-	Volume  string   `json:"volume"`
-	Highest string   `json:"highest"`
-	Lastest float64  `json:"lastest"`
-	Pchange string   `json:"pchange"`
+type BonanzaTransaction struct {
+	INVESTTXID       string
+	PORTFOLIOID      string
+	PORTFOLIOCODE    string
+	SECURITYID       string
+	SECURITYCODE     string
+	REFSECURITYID    string
+	REFSECURITYCODE  string
+	INVESTTXTYPEID   string
+	INVESTTXTYPECODE string
+	CASHTXTYPEID     string
+	CASHTXTYPECODE   string
+	TRADEDATE        string
+	SETTLEDATE       string
+	TRADABLEDATE     string
+	UNIT             string
+	UNITCOST         string
+	YIELD            string
+	COSTAMOUNT       string
+	ACCRUEDINT       string
+	COMMISSIONRATE   string
+	COMMISSIONAMOUNT string
+	WHTAXRATE        string
+	WHTAXAMT         string
+	VATRATE          string
+	VATAMOUNT        string
+	SETTLEAMOUNT     string
+	NETAMOUNT        string
+	PRINCIPALAMOUNT  string
+	ISEFFECTCASH     string
+	CURRENCYID       string
+	CURRENCYCODE     string
+	BROKERID         string
+	BROKERCODE       string
+	COUNTERPARTYID   string
+	COUNTERPARTYCODE string
+	TAXPAYERID       string
+	TAXPAYERCODE     string
+	ISCONFIRMED      string
+	ISPOSTED         string
+	ISCLOSED         string
+	POSTTIME         string
+	INFORMATION      string
+	CASHGLID         string
+	CASHGLCODE       string
+	REMARK           string
 }
 
 func main() {
@@ -86,93 +115,159 @@ func calStock(c echo.Context) (err error) {
 
 	// วนไปเรื่อยๆ ทั้งเดือน
 
-	sday := "30"
-	month := "08"
-	year := "2018"
+	file := "./02012019.xlsx"
+	f, err := excelize.OpenFile(file)
 
-	iday := 0
+	if err != nil {
+		fmt.Println(err)
+	} else {
 
-	// ทำแค่วันเฉยๆ เดือนไม่เอา
-	for i := 0; i < 1; i++ {
-
-		iday, _ = strconv.Atoi(sday)
-		iday++
-		// พอเป็น หลักหน่วยล่ะมีปัญหา 01 => 1
-		if iday < 10 {
-			sday = "0" + strconv.Itoa(iday)
-		} else {
-			sday = strconv.Itoa(iday)
-		}
-
-		file := "./" + sday + month + year + ".xlsx"
-		f, err := excelize.OpenFile(file)
-
+		transactions := []BonanzaTransaction{}
+		rows, err := f.GetRows("Sheet1")
 		if err != nil {
 			fmt.Println(err)
-		} else {
-			var maiStocks []StockPrice
-			var setStocks []StockPrice
-
-			stockPrice := StockPrice{}
-			stockPrice.Name = ""
-			// Get value from cell by given worksheet name and axis.
-
-			stockCount := 0
-			for i := 4; i < 601; i++ {
-				_name := fmt.Sprintf("A%v", i)
-
-				name, err := f.GetCellValue("Sheet1", _name)
-				if err != nil {
-					fmt.Println(err)
-				}
-
-				_lastest := fmt.Sprintf("E%v", i)
-				lastest, err := f.GetCellValue("Sheet1", _lastest)
-				if err != nil {
-					fmt.Println(err)
-				}
-				// fmt.Println(name)
-				// fmt.Println(lastest)
-				if strings.TrimSpace(name) == "SPA" {
-					// MAI
-					stockPrice.Name = strings.TrimSpace(name)
-					floatvalue, _ := strconv.ParseFloat(lastest, 64)
-					stockPrice.Lastest = floatvalue
-					stockPrice.Marks = append(stockPrice.Marks, "")
-					maiStocks = append(maiStocks, stockPrice)
-				} else if strings.TrimSpace(name) == "AU" {
-					// MAI
-					fmt.Println("AU")
-				} else {
-					// SET
-					stockPrice.Name = strings.TrimSpace(name)
-					floatvalue, _ := strconv.ParseFloat(lastest, 64)
-					stockPrice.Lastest = floatvalue
-					stockPrice.Marks = append(stockPrice.Marks, "")
-					setStocks = append(setStocks, stockPrice)
-				}
-
-				stockPrice.Marks = nil
-				stockCount++
-			}
-
-			// เอา วันที่จากใน Excel มาแปลงเวลาเพื่อเตรียมบรรจุลง DB
-			date, err := f.GetCellValue("Sheet1", "D1")
-			if err != nil {
-				fmt.Println(err)
-			}
-			layout := "01-02-06"
-			t, _ := time.Parse(layout, date)
-			// อย่าทำแบบนี้เพราะแบบนี้ SQL INJECTION ได้
-
-			jsonbMaiStocks, _ := json.Marshal(maiStocks)
-			jsonbSetStocks, _ := json.Marshal(setStocks)
-			params := make(map[interface{}]interface{})
-			params["sql"] = fmt.Sprintf("INSERT INTO stock_price (date,set,mai) VALUES ('%v','%s','%s')", t.Format(time.RFC3339), jsonbSetStocks, jsonbMaiStocks)
-			Execute(params)
-
-			fmt.Println("Total Stock SET & MAI", stockCount)
 		}
+		var headerIndex []string
+
+		for i, row := range rows {
+
+			transaction := BonanzaTransaction{}
+			for j, colCell := range row {
+				// rows ที่ i == 0 เป็น Header
+				if i == 0 {
+					headerIndex = append(headerIndex, colCell)
+				} else {
+					//fmt.Println("cell name : ", headerIndex[j], " => ", colCell)
+
+					switch header := headerIndex[j]; header {
+					case "INVESTTXID":
+						transaction.INVESTTXID = colCell
+					case "PORTFOLIOID":
+						transaction.PORTFOLIOID = colCell
+					case "PORTFOLIOCODE":
+						transaction.PORTFOLIOCODE = colCell
+					case "SECURITYID":
+						transaction.SECURITYID = colCell
+					case "SECURITYCODE":
+						transaction.SECURITYCODE = colCell
+					case "REFSECURITYID":
+						transaction.REFSECURITYID = colCell
+					case "REFSECURITYCODE":
+						transaction.REFSECURITYCODE = colCell
+					case "INVESTTXTYPEID":
+						transaction.INVESTTXTYPEID = colCell
+					case "INVESTTXTYPECODE":
+						transaction.INVESTTXTYPECODE = colCell
+					case "CASHTXTYPEID":
+						transaction.CASHTXTYPEID = colCell
+					case "CASHTXTYPECODE":
+						transaction.CASHTXTYPECODE = colCell
+					case "TRADEDATE":
+						transaction.TRADEDATE = colCell
+					case "SETTLEDATE":
+						transaction.SETTLEDATE = colCell
+					case "TRADABLEDATE":
+						transaction.TRADABLEDATE = colCell
+					case "UNIT":
+						transaction.UNIT = colCell
+					case "UNITCOST":
+						transaction.UNITCOST = colCell
+					case "YIELD":
+						transaction.YIELD = colCell
+					case "COSTAMOUNT":
+						transaction.COSTAMOUNT = colCell
+					case "ACCRUEDINT":
+						transaction.ACCRUEDINT = colCell
+					case "COMMISSIONRATE":
+						transaction.COMMISSIONRATE = colCell
+					case "COMMISSIONAMOUNT":
+						transaction.COMMISSIONAMOUNT = colCell
+					case "WHTAXRATE":
+						transaction.WHTAXRATE = colCell
+					case "WHTAXAMT":
+						transaction.WHTAXAMT = colCell
+					case "VATRATE":
+						transaction.VATRATE = colCell
+					case "VATAMOUNT":
+						transaction.VATAMOUNT = colCell
+					case "SETTLEAMOUNT":
+						transaction.SETTLEAMOUNT = colCell
+					case "NETAMOUNT":
+						transaction.NETAMOUNT = colCell
+					case "PRINCIPALAMOUNT":
+						transaction.PRINCIPALAMOUNT = colCell
+					case "ISEFFECTCASH":
+						transaction.ISEFFECTCASH = colCell
+					case "CURRENCYID":
+						transaction.CURRENCYID = colCell
+					case "CURRENCYCODE":
+						transaction.CURRENCYCODE = colCell
+					case "BROKERID":
+						transaction.BROKERID = colCell
+					case "BROKERCODE":
+						transaction.BROKERCODE = colCell
+					case "COUNTERPARTYID":
+						transaction.COUNTERPARTYID = colCell
+					case "COUNTERPARTYCODE":
+						transaction.COUNTERPARTYCODE = colCell
+					case "TAXPAYERID":
+						transaction.TAXPAYERID = colCell
+					case "TAXPAYERCODE":
+						transaction.TAXPAYERCODE = colCell
+					case "ISCONFIRMED":
+						transaction.ISCONFIRMED = colCell
+					case "ISPOSTED":
+						transaction.ISPOSTED = colCell
+					case "ISCLOSED":
+						transaction.ISCLOSED = colCell
+					case "POSTTIME":
+						transaction.POSTTIME = colCell
+					case "INFORMATION":
+						transaction.INFORMATION = colCell
+					case "CASHGLID":
+						transaction.CASHGLID = colCell
+					case "CASHGLCODE":
+						transaction.CASHGLCODE = colCell
+					case "REMARK":
+						transaction.REMARK = colCell
+					default:
+						fmt.Println("!!! OUT OF HEADER !!! ==> ", header)
+					}
+
+					transactions = append(transactions, transaction)
+					// switch {
+					// case t.Hour() < 12:
+					// 	fmt.Println("It's before noon")
+					// default:
+					// 	fmt.Println("It's after noon")
+					// }
+
+					// switch os := runtime.GOOS; os {
+					// case "darwin":
+					// 	fmt.Println("OS X.")
+					// case "linux":
+					// 	fmt.Println("Linux.")
+					// default:
+					// 	// freebsd, openbsd,
+					// 	// plan9, windows...
+					// 	fmt.Printf("%s.\n", os)
+					// }
+
+					//fmt.Println("headerIndex[j] ", headerIndex[j])
+					// test := fmt.Sprintf("transaction.%v", headerIndex[j])
+					// test = 11
+					//transaction.headerIndex[j] = colCell
+				}
+
+			}
+
+		}
+
+		// แปลง transactions เพื่อ Inset เข้า DB
+		//params["sql"] = fmt.Sprintf("INSERT INTO portfolio_transactions (user_id,set,trade_date,settled_date,security_code,class,security_type,investment,order_no,pre_transaction_no,post_transaction_no,linked_transaction_no,transaction_type,issuer,counter_party_broker,cash_type,yield,units,transaction_currency,cost_per_unit_exclude_commission,commission_percentage,commission_amount,vat,vat_amount,commission_and_vat,settlement_amount,net_amount,cash_security_code,status,posttime,remark,is_import_order,portfolio_name,institute,action,maturity_date,cost_amount,portfolio_currency,security_id,security_code_ref,portfolio_id) VALUES ('%v','%s','%s')", jsonbSetStocks, jsonbMaiStocks)
+		// params := make(map[interface{}]interface{})
+		// Execute(params)
+
 	}
 
 	defer db.Close()
