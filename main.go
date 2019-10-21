@@ -42,7 +42,7 @@ func Execute(params map[interface{}]interface{}) {
 }
 
 func Execute2(txn BonanzaTransaction) error {
-	_, err := sqlPostgresHandler.Conn.Exec(`INSERT INTO portfolio_transactions (invest_tx_id,portfolio_id,portfolio_code,security_id,security_code,ref_security_id,ref_security_code,invest_tx_type_id,invest_tx_type_code,cash_type_id,cash_type_code,trade_date,settled_date,tradable_date,units,unit_cost,yield,cost_amount,accrued_int,commission_rate,commision_amount,wh_tax_rate,wh_tax_amount,vat_rate,vat_amount,settle_amount,net_amount,principal_amount,is_effect_cash,currency_id,currency_code,broker_id,broker_code,counter_party_id,counter_party_code,tax_payer_id,tax_payer_code) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37)`, txn.INVESTTXID, txn.PORTFOLIOID, txn.PORTFOLIOCODE, txn.SECURITYID, txn.SECURITYCODE, NewNullString(txn.REFSECURITYID), NewNullString(txn.REFSECURITYCODE), txn.INVESTTXTYPEID, txn.INVESTTXTYPECODE, NewNullString(txn.CASHTXTYPEID), NewNullString(txn.CASHTXTYPECODE), txn.TRADEDATE, txn.SETTLEDATE, NewNullString(txn.TRADABLEDATE), txn.UNIT, txn.UNITCOST, txn.YIELD, txn.COSTAMOUNT, txn.ACCRUEDINT, txn.COMMISSIONRATE, txn.COMMISSIONAMOUNT, txn.WHTAXRATE, txn.WHTAXAMT, NewNullString(txn.VATRATE), txn.VATAMOUNT, txn.SETTLEAMOUNT, txn.NETAMOUNT, txn.PRINCIPALAMOUNT, txn.ISEFFECTCASH, txn.CURRENCYID, txn.CURRENCYCODE, NewNullString(txn.BROKERID), NewNullString(txn.BROKERCODE), NewNullString(txn.COUNTERPARTYID), NewNullString(txn.COUNTERPARTYCODE), NewNullString(txn.TAXPAYERID), NewNullString(txn.TAXPAYERCODE))
+	_, err := sqlPostgresHandler.Conn.Exec(`INSERT INTO portfolio_transactions (invest_tx_id,portfolio_id,portfolio_code,security_id,security_code,ref_security_id,ref_security_code,invest_tx_type_id,invest_tx_type_code,cash_type_id,cash_type_code,trade_date,settled_date,tradable_date,units,unit_cost,yield,cost_amount,accrued_int,commission_rate,commision_amount,wh_tax_rate,wh_tax_amount,vat_rate,vat_amount,settle_amount,net_amount,principal_amount,is_effect_cash,currency_id,currency_code,broker_id,broker_code,counter_party_id,counter_party_code,tax_payer_id,tax_payer_code,is_confirmed,is_posted,is_closed,posttime,information,cash_gl_id,cash_gl_code,remark) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45)`, txn.INVESTTXID, txn.PORTFOLIOID, txn.PORTFOLIOCODE, txn.SECURITYID, txn.SECURITYCODE, NewNullString(txn.REFSECURITYID), NewNullString(txn.REFSECURITYCODE), txn.INVESTTXTYPEID, txn.INVESTTXTYPECODE, NewNullString(txn.CASHTXTYPEID), NewNullString(txn.CASHTXTYPECODE), txn.TRADEDATE, txn.SETTLEDATE, NewNullString(txn.TRADABLEDATE), txn.UNIT, txn.UNITCOST, txn.YIELD, txn.COSTAMOUNT, txn.ACCRUEDINT, txn.COMMISSIONRATE, txn.COMMISSIONAMOUNT, txn.WHTAXRATE, txn.WHTAXAMT, NewNullString(txn.VATRATE), txn.VATAMOUNT, txn.SETTLEAMOUNT, txn.NETAMOUNT, txn.PRINCIPALAMOUNT, txn.ISEFFECTCASH, txn.CURRENCYID, txn.CURRENCYCODE, NewNullString(txn.BROKERID), NewNullString(txn.BROKERCODE), NewNullString(txn.COUNTERPARTYID), NewNullString(txn.COUNTERPARTYCODE), NewNullString(txn.TAXPAYERID), NewNullString(txn.TAXPAYERCODE), txn.ISCONFIRMED, txn.ISPOSTED, txn.ISCLOSED, txn.POSTTIME, NewNullString(txn.INFORMATION), NewNullString(txn.CASHGLID), NewNullString(txn.CASHGLCODE), NewNullString(txn.REMARK))
 	if err != nil {
 		panic(err)
 	}
@@ -275,20 +275,47 @@ func calStock(c echo.Context) (err error) {
 						}
 						transaction.TAXPAYERCODE = colCell
 					case "ISCONFIRMED":
+						if colCell == "Y" || colCell == "y" {
+							colCell = "true"
+						} else if colCell == "N" || colCell == "n" {
+							colCell = "false"
+						}
 						transaction.ISCONFIRMED = colCell
 					case "ISPOSTED":
+						if colCell == "Y" || colCell == "y" {
+							colCell = "true"
+						} else if colCell == "N" || colCell == "n" {
+							colCell = "false"
+						}
 						transaction.ISPOSTED = colCell
 					case "ISCLOSED":
+						if colCell == "Y" || colCell == "y" {
+							colCell = "true"
+						} else if colCell == "N" || colCell == "n" {
+							colCell = "false"
+						}
 						transaction.ISCLOSED = colCell
 					case "POSTTIME":
 						transaction.POSTTIME = colCell
 					case "INFORMATION":
+						if colCell == "NULL" || colCell == "" {
+							colCell = ""
+						}
 						transaction.INFORMATION = colCell
 					case "CASHGLID":
+						if colCell == "NULL" || colCell == "" {
+							colCell = ""
+						}
 						transaction.CASHGLID = colCell
 					case "CASHGLCODE":
+						if colCell == "NULL" || colCell == "" {
+							colCell = ""
+						}
 						transaction.CASHGLCODE = colCell
 					case "REMARK":
+						if colCell == "NULL" || colCell == "" {
+							colCell = ""
+						}
 						transaction.REMARK = colCell
 					default:
 						fmt.Println("!!! OUT OF HEADER !!! ==> ", header)
